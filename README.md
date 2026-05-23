@@ -5,12 +5,19 @@ An interactive and visually appealing Operating System CPU Scheduling Simulator 
 
 ✨ Features
  Beautiful and responsive UI design
+ 
  Animated Gantt Chart visualization
+ 
  Real-time scheduling simulation
+ 
  Performance metrics comparison
+ 
  Random process data generation
+ 
  Step-by-step algorithm learning mode
+ 
  Fully responsive for desktop and mobile devices
+ 
 🧮 Implemented Algorithms
  FCFS (First Come First Serve)
  SJF (Shortest Job First)
