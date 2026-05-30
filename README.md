@@ -51,4 +51,11 @@ This project was created to make learning CPU Scheduling Algorithms easier and m
  Smooth animations and transitions
  
  Beginner-friendly educational tool
+
+ # CPU Scheduling Visualizer
+
+Live Demo:
+https://uditaarora.github.io/CPU-Shed-/
+
+A web-based CPU Scheduling Visualizer for Operating Systems students.
  
