@@ -1,0 +1,2 @@
+/* style.css — redirects to shared.css for backward compatibility */
+@import url('shared.css');

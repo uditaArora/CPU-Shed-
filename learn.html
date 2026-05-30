@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Learn — CPUSched</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="shared.css"/>
+  <style>
+    .learn-hero { position:relative;z-index:1;text-align:center;padding:48px 24px 32px; }
+    .learn-hero h1 { font-size:clamp(1.8rem,4vw,3rem);font-weight:900;color:var(--text); }
+    .learn-hero h1 span { background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+    .learn-hero p { color:var(--text-muted);margin-top:10px;font-size:1.05rem; }
+
+    /* Algo tabs */
+    .algo-tabs { display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:0 24px 32px;position:relative;z-index:1; }
+    .algo-tab {
+      padding:10px 24px;border-radius:50px;border:2px solid var(--border);
+      background:var(--surface);font-family:var(--font-body);font-size:.88rem;font-weight:700;
+      color:var(--text-muted);cursor:pointer;transition:all .2s;
+    }
+    .algo-tab:hover { border-color:var(--primary);color:var(--primary); }
+    .algo-tab.active { background:linear-gradient(135deg,var(--primary),var(--secondary));color:#fff;border-color:transparent;box-shadow:0 4px 20px rgba(236,72,153,.3); }
+
+    /* Learn content */
+    .learn-content { max-width:1100px;margin:0 auto 60px;padding:0 20px;position:relative;z-index:1; }
+    .algo-section { display:none; }
+    .algo-section.active { display:block; }
+
+    /* Info + sim layout */
+    .learn-grid { display:grid;grid-template-columns:340px 1fr;gap:20px; }
+    @media(max-width:900px){ .learn-grid{grid-template-columns:1fr} }
+
+    /* Info card */
+    .info-card { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-sm);position:sticky;top:80px; }
+    .info-card h2 { font-size:1.3rem;font-weight:900;color:var(--text);margin-bottom:6px; }
+    .info-tag { display:inline-block;padding:3px 12px;border-radius:50px;font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:14px; }
+    .info-tag.pink { background:var(--primary-light);color:var(--primary); }
+    .info-tag.purple { background:var(--secondary-light);color:var(--secondary); }
+    .info-tag.rose { background:rgba(244,63,94,.1);color:var(--accent); }
+    .info-tag.fuchsia { background:rgba(217,70,239,.1);color:#d946ef; }
+    .info-desc { font-size:.88rem;color:var(--text-muted);line-height:1.7;margin-bottom:16px; }
+    .info-props { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+    .info-prop { background:var(--surface-2);border-radius:10px;padding:10px 12px; }
+    .info-prop-label { font-size:.68rem;font-weight:700;color:var(--text-light);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:3px; }
+    .info-prop-value { font-size:.9rem;font-weight:800;color:var(--primary); }
+    .pros-cons { margin-top:16px; }
+    .pros-cons h4 { font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--text-muted);margin-bottom:8px; }
+    .pc-item { display:flex;align-items:flex-start;gap:8px;font-size:.82rem;color:var(--text-muted);margin-bottom:5px; }
+    .pc-dot { flex-shrink:0;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.7rem;margin-top:2px; }
+    .pc-dot.pro { background:rgba(16,185,129,.15);color:var(--green); }
+    .pc-dot.con { background:rgba(244,63,94,.12);color:var(--accent); }
+
+    /* Simulation panel */
+    .sim-panel { background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-sm);position:relative;overflow:hidden; }
+    .sim-panel::before { content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary),var(--accent)); }
+
+    /* Process queue visual */
+    .queue-label { font-size:.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px; }
+    .process-bubbles { display:flex;flex-wrap:wrap;gap:8px;min-height:52px;align-items:center; }
+    .proc-bubble {
+      display:flex;flex-direction:column;align-items:center;justify-content:center;
+      width:56px;height:56px;border-radius:50%;font-family:var(--font-mono);font-weight:700;
+      font-size:.78rem;color:#fff;cursor:default;transition:all .3s;position:relative;
+      box-shadow:0 4px 14px rgba(0,0,0,.1);
+    }
+    .proc-bubble .bub-sub { font-size:.6rem;opacity:.8; }
+    .proc-bubble.running { transform:scale(1.2);box-shadow:0 0 0 4px rgba(236,72,153,.3),0 6px 20px rgba(0,0,0,.15);animation:pulse-ring 1s ease-in-out infinite; }
+    .proc-bubble.done { opacity:.35;transform:scale(.9); }
+    .proc-bubble.waiting { opacity:.7; }
+
+    /* Clock & controls */
+    .sim-controls { display:flex;align-items:center;gap:10px;margin:18px 0;flex-wrap:wrap; }
+    .clock-display { background:var(--surface-2);border:1.5px solid var(--border-strong);border-radius:10px;padding:8px 16px;font-family:var(--font-mono);font-size:.9rem;font-weight:700;color:var(--primary); }
+    .step-log { background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;min-height:80px;max-height:160px;overflow-y:auto;font-family:var(--font-mono);font-size:.75rem;line-height:1.7;color:var(--text-muted);margin-top:12px; }
+    .log-entry { padding:2px 0;border-bottom:1px solid rgba(236,72,153,.06); }
+    .log-entry .log-time { color:var(--primary);font-weight:700;margin-right:6px; }
+    .log-entry .log-msg { color:var(--text-muted); }
+
+    /* Gantt mini */
+    .gantt-mini { min-height:48px;display:flex;align-items:stretch;gap:2px;border-radius:10px;overflow:hidden;margin-top:14px; }
+    .gantt-mini-block { display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;font-size:.72rem;color:#fff;min-width:24px;border-radius:4px; }
+    .gantt-mini-block.idle { background:var(--surface-2)!important;color:var(--text-light)!important; }
+
+    /* Complexity table */
+    .complexity-box { background:var(--surface-2);border-radius:var(--radius);padding:14px;margin-top:16px; }
+    .complexity-box h4 { font-size:.78rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px; }
+    .complexity-row { display:flex;justify-content:space-between;font-size:.82rem;padding:4px 0;border-bottom:1px solid rgba(236,72,153,.08); }
+    .complexity-row:last-child { border:none; }
+    .complexity-key { color:var(--text-muted); }
+    .complexity-val { font-family:var(--font-mono);font-weight:700;color:var(--primary); }
+
+    /* Btn small */
+    .btn-sm { padding:7px 14px;font-size:.8rem;border-radius:8px; }
+  </style>
+</head>
+<body>
+  <canvas id="particles-canvas"></canvas>
+  <div class="toast-container" id="toast-container"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo"><div class="nav-logo-icon">💻</div>CPU<span>Sched</span></a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="simulator.html" class="nav-link">Simulator</a>
+        <a href="learn.html" class="nav-link active">Learn</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="learn-hero">
+    <h1>Learn <span>CPU Scheduling</span></h1>
+    <p>Step-by-step animated simulations of each scheduling algorithm</p>
+  </div>
+
+  <div class="algo-tabs">
+    <button class="algo-tab active" onclick="showAlgo('fcfs',this)">⇒ FCFS</button>
+    <button class="algo-tab" onclick="showAlgo('sjf',this)">⚡ SJF</button>
+    <button class="algo-tab" onclick="showAlgo('rr',this)">🔄 Round Robin</button>
+    <button class="algo-tab" onclick="showAlgo('priority',this)">⭐ Priority</button>
+  </div>
+
+  <div class="learn-content">
+
+    <!-- ── FCFS ── -->
+    <div class="algo-section active" id="section-fcfs">
+      <div class="learn-grid">
+        <div class="info-card">
+          <span class="info-tag pink">FCFS</span>
+          <h2>First Come First Serve</h2>
+          <p class="info-desc">The simplest scheduling algorithm. Processes are executed in the exact order they arrive in the ready queue. No priority, no preemption — whoever came first gets the CPU first.</p>
+          <div class="info-props">
+            <div class="info-prop"><span class="info-prop-label">Preemption</span><span class="info-prop-value">None</span></div>
+            <div class="info-prop"><span class="info-prop-label">Complexity</span><span class="info-prop-value">O(n log n)</span></div>
+            <div class="info-prop"><span class="info-prop-label">Starvation</span><span class="info-prop-value">No</span></div>
+            <div class="info-prop"><span class="info-prop-label">Overhead</span><span class="info-prop-value">Very Low</span></div>
+          </div>
+          <div class="complexity-box">
+            <h4>Performance</h4>
+            <div class="complexity-row"><span class="complexity-key">Time Complexity</span><span class="complexity-val">O(n log n)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Space Complexity</span><span class="complexity-val">O(n)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Avg WT (worst)</span><span class="complexity-val">High</span></div>
+          </div>
+          <div class="pros-cons">
+            <h4>✅ Pros</h4>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Simple to implement</div>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Fair — no starvation</div>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Low scheduling overhead</div>
+            <h4 style="margin-top:10px">❌ Cons</h4>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Convoy effect</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>High average waiting time</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Not suitable for time-sharing</div>
+          </div>
+        </div>
+        <div class="sim-panel" id="sim-fcfs">
+          <div class="panel-header"><div class="step-badge">Simulation</div><h3 class="panel-title">FCFS Step-by-Step</h3></div>
+          <div class="sim-controls">
+            <div class="clock-display">⏱ t = <span id="fcfs-clock">0</span></div>
+            <button class="btn btn--primary btn-sm" onclick="learnStep('fcfs')">Next Step →</button>
+            <button class="btn btn--outline btn-sm" onclick="learnReset('fcfs')">↺ Reset</button>
+            <button class="btn btn--ghost btn-sm" onclick="learnAuto('fcfs')">▶ Auto</button>
+          </div>
+          <div class="queue-label">Ready Queue</div>
+          <div class="process-bubbles" id="fcfs-bubbles"></div>
+          <div class="gantt-mini" id="fcfs-gantt"></div>
+          <div class="step-log" id="fcfs-log"><div class="log-entry"><span class="log-time">t=0</span><span class="log-msg">Simulation ready. Press "Next Step" to begin.</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SJF ── -->
+    <div class="algo-section" id="section-sjf">
+      <div class="learn-grid">
+        <div class="info-card">
+          <span class="info-tag purple">SJF</span>
+          <h2>Shortest Job First</h2>
+          <p class="info-desc">At each scheduling decision point, the process with the shortest CPU burst time is selected. This is provably optimal for minimizing average waiting time, but requires knowing burst times in advance.</p>
+          <div class="info-props">
+            <div class="info-prop"><span class="info-prop-label">Preemption</span><span class="info-prop-value">None</span></div>
+            <div class="info-prop"><span class="info-prop-label">Complexity</span><span class="info-prop-value">O(n²)</span></div>
+            <div class="info-prop"><span class="info-prop-label">Starvation</span><span class="info-prop-value">Yes</span></div>
+            <div class="info-prop"><span class="info-prop-label">Optimal WT</span><span class="info-prop-value">Yes</span></div>
+          </div>
+          <div class="complexity-box">
+            <h4>Performance</h4>
+            <div class="complexity-row"><span class="complexity-key">Time Complexity</span><span class="complexity-val">O(n²)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Space Complexity</span><span class="complexity-val">O(n)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Avg WT</span><span class="complexity-val">Minimum</span></div>
+          </div>
+          <div class="pros-cons">
+            <h4>✅ Pros</h4>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Minimum average waiting time</div>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Better throughput than FCFS</div>
+            <h4 style="margin-top:10px">❌ Cons</h4>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Long processes may starve</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Burst time must be known</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Not practical in real OS</div>
+          </div>
+        </div>
+        <div class="sim-panel" id="sim-sjf">
+          <div class="panel-header"><div class="step-badge">Simulation</div><h3 class="panel-title">SJF Step-by-Step</h3></div>
+          <div class="sim-controls">
+            <div class="clock-display">⏱ t = <span id="sjf-clock">0</span></div>
+            <button class="btn btn--primary btn-sm" onclick="learnStep('sjf')">Next Step →</button>
+            <button class="btn btn--outline btn-sm" onclick="learnReset('sjf')">↺ Reset</button>
+            <button class="btn btn--ghost btn-sm" onclick="learnAuto('sjf')">▶ Auto</button>
+          </div>
+          <div class="queue-label">Ready Queue</div>
+          <div class="process-bubbles" id="sjf-bubbles"></div>
+          <div class="gantt-mini" id="sjf-gantt"></div>
+          <div class="step-log" id="sjf-log"><div class="log-entry"><span class="log-time">t=0</span><span class="log-msg">Simulation ready. Press "Next Step" to begin.</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RR ── -->
+    <div class="algo-section" id="section-rr">
+      <div class="learn-grid">
+        <div class="info-card">
+          <span class="info-tag rose">Round Robin</span>
+          <h2>Round Robin</h2>
+          <p class="info-desc">Each process gets a fixed time slice (quantum). When a process's quantum expires, it's preempted and added to the back of the ready queue. Excellent for time-sharing systems.</p>
+          <div class="info-props">
+            <div class="info-prop"><span class="info-prop-label">Preemption</span><span class="info-prop-value">Yes</span></div>
+            <div class="info-prop"><span class="info-prop-label">Complexity</span><span class="info-prop-value">O(n)</span></div>
+            <div class="info-prop"><span class="info-prop-label">Starvation</span><span class="info-prop-value">No</span></div>
+            <div class="info-prop"><span class="info-prop-label">Quantum</span><span class="info-prop-value">Configurable</span></div>
+          </div>
+          <div class="complexity-box">
+            <h4>Performance</h4>
+            <div class="complexity-row"><span class="complexity-key">Time Complexity</span><span class="complexity-val">O(n·q)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Space Complexity</span><span class="complexity-val">O(n)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Response Time</span><span class="complexity-val">Low</span></div>
+          </div>
+          <div class="field" style="margin-top:12px">
+            <label>Time Quantum for simulation</label>
+            <div class="quantum-row">
+              <input type="range" id="rr-quantum-range" min="1" max="8" value="2" oninput="document.getElementById('rr-quantum').value=this.value; learnReset('rr')"/>
+              <input type="number" id="rr-quantum" value="2" min="1" max="20" style="width:70px" oninput="document.getElementById('rr-quantum-range').value=this.value; learnReset('rr')"/>
+            </div>
+          </div>
+          <div class="pros-cons" style="margin-top:12px">
+            <h4>✅ Pros</h4>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Fair — no starvation</div>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Good response time</div>
+            <h4 style="margin-top:10px">❌ Cons</h4>
+            <div class="pc-item"><div class="pc-dot con">✗</div>High context-switch overhead</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Quantum size is critical</div>
+          </div>
+        </div>
+        <div class="sim-panel" id="sim-rr">
+          <div class="panel-header"><div class="step-badge">Simulation</div><h3 class="panel-title">Round Robin Step-by-Step</h3></div>
+          <div class="sim-controls">
+            <div class="clock-display">⏱ t = <span id="rr-clock">0</span></div>
+            <button class="btn btn--primary btn-sm" onclick="learnStep('rr')">Next Step →</button>
+            <button class="btn btn--outline btn-sm" onclick="learnReset('rr')">↺ Reset</button>
+            <button class="btn btn--ghost btn-sm" onclick="learnAuto('rr')">▶ Auto</button>
+          </div>
+          <div class="queue-label">Ready Queue</div>
+          <div class="process-bubbles" id="rr-bubbles"></div>
+          <div class="gantt-mini" id="rr-gantt"></div>
+          <div class="step-log" id="rr-log"><div class="log-entry"><span class="log-time">t=0</span><span class="log-msg">Simulation ready. Press "Next Step" to begin.</span></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PRIORITY ── -->
+    <div class="algo-section" id="section-priority">
+      <div class="learn-grid">
+        <div class="info-card">
+          <span class="info-tag fuchsia">Priority</span>
+          <h2>Priority Scheduling</h2>
+          <p class="info-desc">Each process is assigned a priority number. The scheduler always selects the highest priority (lowest number) process from the ready queue. Ties are broken by arrival time.</p>
+          <div class="info-props">
+            <div class="info-prop"><span class="info-prop-label">Preemption</span><span class="info-prop-value">None</span></div>
+            <div class="info-prop"><span class="info-prop-label">Complexity</span><span class="info-prop-value">O(n²)</span></div>
+            <div class="info-prop"><span class="info-prop-label">Starvation</span><span class="info-prop-value">Yes</span></div>
+            <div class="info-prop"><span class="info-prop-label">Lower # = ?</span><span class="info-prop-value">Higher Prio</span></div>
+          </div>
+          <div class="complexity-box">
+            <h4>Performance</h4>
+            <div class="complexity-row"><span class="complexity-key">Time Complexity</span><span class="complexity-val">O(n²)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Space Complexity</span><span class="complexity-val">O(n)</span></div>
+            <div class="complexity-row"><span class="complexity-key">Fairness</span><span class="complexity-val">Low</span></div>
+          </div>
+          <div class="pros-cons">
+            <h4>✅ Pros</h4>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Flexible priority control</div>
+            <div class="pc-item"><div class="pc-dot pro">✓</div>Critical tasks run first</div>
+            <h4 style="margin-top:10px">❌ Cons</h4>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Low-priority starvation</div>
+            <div class="pc-item"><div class="pc-dot con">✗</div>Requires priority assignment</div>
+          </div>
+        </div>
+        <div class="sim-panel" id="sim-priority">
+          <div class="panel-header"><div class="step-badge">Simulation</div><h3 class="panel-title">Priority Step-by-Step</h3></div>
+          <div class="sim-controls">
+            <div class="clock-display">⏱ t = <span id="priority-clock">0</span></div>
+            <button class="btn btn--primary btn-sm" onclick="learnStep('priority')">Next Step →</button>
+            <button class="btn btn--outline btn-sm" onclick="learnReset('priority')">↺ Reset</button>
+            <button class="btn btn--ghost btn-sm" onclick="learnAuto('priority')">▶ Auto</button>
+          </div>
+          <div class="queue-label">Ready Queue</div>
+          <div class="process-bubbles" id="priority-bubbles"></div>
+          <div class="gantt-mini" id="priority-gantt"></div>
+          <div class="step-log" id="priority-log"><div class="log-entry"><span class="log-time">t=0</span><span class="log-msg">Simulation ready. Press "Next Step" to begin.</span></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="site-footer"><span>CPUSched Learn</span><span class="footer-sep">·</span><span>Made with 💖 for OS students</span></footer>
+
+  <script src="particles.js"></script>
+  <script src="learn.js"></script>
+</body>
+</html>

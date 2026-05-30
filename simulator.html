@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Simulator — CPUSched</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="shared.css"/>
+  <style>
+    .sim-layout { position:relative;z-index:1;max-width:1200px;margin:28px auto;padding:0 20px;display:grid;grid-template-columns:1fr 1fr;gap:20px; }
+    @media(max-width:820px){.sim-layout{grid-template-columns:1fr}}
+
+    /* Auto-generate strip */
+    .autogen-strip {
+      background:linear-gradient(135deg,rgba(236,72,153,.08),rgba(168,85,247,.08));
+      border:1.5px dashed var(--border-strong);
+      border-radius:var(--radius-lg); padding:16px 20px;
+      display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+      margin-bottom:14px;
+    }
+    .autogen-strip label { font-size:.8rem;font-weight:700;color:var(--primary);letter-spacing:0;text-transform:none; }
+    .autogen-strip input[type=number] { width:70px; padding:7px 10px; }
+    .autogen-icon { font-size:1.4rem; }
+
+    /* Algorithm cards */
+    .algo-cards { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px; }
+    .algo-card { display:flex;flex-direction:column;align-items:center;background:var(--bg);border:2px solid var(--border);border-radius:14px;padding:14px 12px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden; }
+    .algo-card.active { border-color:var(--primary);background:var(--primary-light);box-shadow:0 4px 20px rgba(236,72,153,.15); }
+    .algo-card:hover:not(.active) { border-color:var(--border-strong);background:var(--surface-2); }
+    .algo-card-icon { font-size:1.5rem;margin-bottom:5px; }
+    .algo-card-label { font-size:.82rem;font-weight:800;color:var(--text); }
+    .algo-card-sub { font-size:.65rem;color:var(--text-muted);margin-top:2px; }
+
+    .algo-desc { background:var(--surface-2);border-left:3px solid var(--primary);border-radius:0 var(--radius) var(--radius) 0;padding:12px 14px;font-size:.82rem;color:var(--text-muted);line-height:1.7;margin-bottom:16px; }
+    .algo-desc strong { color:var(--primary); }
+
+    .action-row { display:flex;gap:10px; }
+    .quantum-row { display:flex;align-items:center;gap:10px; }
+    .quantum-row input[type=number] { width:70px;flex-shrink:0; }
+    .presets-row { display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap; }
+    .presets-label { font-size:.72rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em; }
+    .preset-btn { background:transparent;border:1.5px solid var(--border);color:var(--text-muted);font-family:var(--font-body);font-size:.75rem;font-weight:700;padding:4px 12px;border-radius:20px;cursor:pointer;transition:all .2s; }
+    .preset-btn:hover { border-color:var(--primary);color:var(--primary);background:var(--primary-light); }
+
+    .input-group { display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px; }
+    .btn--add { grid-column:1/-1; }
+
+    .page-header { position:relative;z-index:1;background:rgba(255,255,255,.9);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:16px 20px 14px;max-width:1200px;margin:16px auto 0;border-radius:var(--radius-lg);display:flex;align-items:center;gap:14px;flex-wrap:wrap; }
+    .page-header h1 { font-size:1.3rem;font-weight:900;color:var(--text); }
+    .header-stat-pills { display:flex;gap:8px;margin-left:auto;flex-wrap:wrap; }
+    .hpill { display:flex;align-items:center;gap:6px;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:.75rem;font-weight:700;color:var(--text-muted); }
+    .hpill-dot { width:7px;height:7px;border-radius:50%;background:var(--primary);animation:pulse-ring 1.5s ease-in-out infinite; }
+    .hpill.algo { color:var(--primary);border-color:var(--border-strong); }
+  </style>
+</head>
+<body>
+  <canvas id="particles-canvas"></canvas>
+  <div class="toast-container" id="toast-container"></div>
+
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo"><div class="nav-logo-icon">💻</div>CPU<span>Sched</span></a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="simulator.html" class="nav-link active">Simulator</a>
+        <a href="learn.html" class="nav-link">Learn</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Page header with stats -->
+  <div class="page-header">
+    <span style="font-size:1.5rem">⚙️</span>
+    <h1>CPU Scheduler Simulator</h1>
+    <div class="header-stat-pills">
+      <div class="hpill"><div class="hpill-dot"></div><span id="stat-proc-count">0</span> processes</div>
+      <div class="hpill algo" id="stat-algo-pill">FCFS</div>
+    </div>
+  </div>
+
+  <!-- Main sim layout -->
+  <div class="sim-layout">
+    <!-- LEFT: Process Input -->
+    <section class="panel">
+      <div class="panel-header"><div class="step-badge">01</div><h2 class="panel-title">Define Processes</h2></div>
+
+      <!-- Auto-generate strip -->
+      <div class="autogen-strip">
+        <span class="autogen-icon">🤖</span>
+        <label>Auto-generate:</label>
+        <input type="number" id="autogen-count" value="5" min="2" max="12" />
+        <span style="font-size:.8rem;color:var(--text-muted)">processes</span>
+        <button class="btn btn--primary" style="padding:7px 16px;font-size:.82rem" onclick="autoGenerate()">✨ Generate</button>
+      </div>
+
+      <div class="input-group">
+        <div class="field"><label for="inp-pid">Process ID</label><input type="text" id="inp-pid" placeholder="e.g. P1" maxlength="6" autocomplete="off"/></div>
+        <div class="field"><label for="inp-arrival">Arrival Time</label><input type="number" id="inp-arrival" placeholder="0" min="0"/></div>
+        <div class="field"><label for="inp-burst">Burst Time</label><input type="number" id="inp-burst" placeholder="1" min="1"/></div>
+        <div class="field field--priority hidden" id="priority-field">
+          <label for="inp-priority">Priority <span class="hint">(lower=higher)</span></label>
+          <input type="number" id="inp-priority" placeholder="1" min="1"/>
+        </div>
+        <button class="btn btn--add" id="btn-add-process" onclick="addProcess()">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          Add Process
+        </button>
+      </div>
+
+      <div class="presets-row">
+        <span class="presets-label">Presets:</span>
+        <button class="preset-btn" onclick="loadPreset('simple')">Simple (3P)</button>
+        <button class="preset-btn" onclick="loadPreset('medium')">Medium (5P)</button>
+        <button class="preset-btn" onclick="loadPreset('complex')">Complex (6P)</button>
+      </div>
+
+      <div class="table-wrap">
+        <table class="process-table" aria-live="polite">
+          <thead><tr><th>PID</th><th>Arrival</th><th>Burst</th><th class="col-priority hidden" id="th-priority">Priority</th><th>Del</th></tr></thead>
+          <tbody id="process-tbody"></tbody>
+        </table>
+        <p class="empty-hint" id="table-empty"><svg width="28" height="28" viewBox="0 0 28 28" fill="none"><rect x="3" y="3" width="22" height="22" rx="4" stroke="currentColor" stroke-width="1.5"/><path d="M9 14h10M14 9v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>Add a process or pick a preset.</p>
+      </div>
+    </section>
+
+    <!-- RIGHT: Algorithm Settings -->
+    <section class="panel">
+      <div class="panel-header"><div class="step-badge">02</div><h2 class="panel-title">Configure Algorithm</h2></div>
+      <div class="algo-cards" id="algo-cards">
+        <label class="algo-card active" data-algo="fcfs"><input type="radio" name="algo" value="fcfs" checked hidden/><div class="algo-card-icon">⇒</div><div class="algo-card-label">FCFS</div><div class="algo-card-sub">First Come First Serve</div></label>
+        <label class="algo-card" data-algo="sjf"><input type="radio" name="algo" value="sjf" hidden/><div class="algo-card-icon">⚡</div><div class="algo-card-label">SJF</div><div class="algo-card-sub">Shortest Job First</div></label>
+        <label class="algo-card" data-algo="rr"><input type="radio" name="algo" value="rr" hidden/><div class="algo-card-icon">🔄</div><div class="algo-card-label">Round Robin</div><div class="algo-card-sub">Time-sliced</div></label>
+        <label class="algo-card" data-algo="priority"><input type="radio" name="algo" value="priority" hidden/><div class="algo-card-icon">⭐</div><div class="algo-card-label">Priority</div><div class="algo-card-sub">Priority-based</div></label>
+      </div>
+      <div class="field field--rr hidden" id="quantum-field" style="margin-bottom:16px">
+        <label for="inp-quantum">Time Quantum</label>
+        <div class="quantum-row">
+          <input type="range" id="inp-quantum-range" min="1" max="10" value="2" oninput="syncQuantum(this.value)"/>
+          <input type="number" id="inp-quantum" value="2" min="1" max="99" oninput="syncQuantumRange(this.value)"/>
+        </div>
+      </div>
+      <div class="algo-desc" id="algo-desc"></div>
+      <div class="action-row">
+        <button class="btn btn--primary" id="btn-run" onclick="runScheduler()" style="flex:1;justify-content:center;padding:13px">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M5 3l10 6-10 6V3z" fill="currentColor"/></svg>
+          Run Scheduler
+        </button>
+        <button class="btn btn--ghost" onclick="resetAll()" style="padding:13px 18px">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1 0 1.5-3.9M2 4v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Reset
+        </button>
+      </div>
+    </section>
+  </div>
+
+  <!-- RESULTS -->
+  <section class="results-section hidden" id="results-section">
+    <div class="stats-row" id="stats-row"></div>
+    <div class="results-card" id="gantt-card">
+      <div class="panel-header">
+        <div class="step-badge">03</div>
+        <h2 class="panel-title">Gantt Chart</h2>
+        <div class="gantt-legend" id="gantt-legend"></div>
+      </div>
+      <div class="gantt-wrapper">
+        <div class="gantt-chart" id="gantt-chart" role="img" aria-label="Gantt chart"></div>
+        <div class="gantt-axis" id="gantt-axis"></div>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="results-card chart-card"><div class="panel-header"><h3 class="panel-title panel-title--sm">⏱ Waiting Time</h3></div><div class="chart-container"><canvas id="chart-waiting"></canvas></div></div>
+      <div class="results-card chart-card"><div class="panel-header"><h3 class="panel-title panel-title--sm">🔄 Turnaround Time</h3></div><div class="chart-container"><canvas id="chart-turnaround"></canvas></div></div>
+      <div class="results-card chart-card chart-card--donut"><div class="panel-header"><h3 class="panel-title panel-title--sm">🖥 CPU Usage</h3></div><div class="chart-container"><canvas id="chart-cpu"></canvas></div></div>
+    </div>
+    <div class="results-card">
+      <div class="panel-header"><div class="step-badge">04</div><h2 class="panel-title">Process Metrics</h2></div>
+      <div class="table-wrap">
+        <table class="metrics-table">
+          <thead><tr><th>PID</th><th>Arrival</th><th>Burst</th><th>Completion</th><th>Turnaround</th><th>Waiting</th><th>Response</th><th>WT Bar</th></tr></thead>
+          <tbody id="metrics-tbody"></tbody>
+        </table>
+      </div>
+      <div class="averages" id="averages-box"></div>
+    </div>
+  </section>
+
+  <footer class="site-footer"><span>CPUSched Simulator</span><span class="footer-sep">·</span><span>Made with 💖</span></footer>
+
+  <script src="particles.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
